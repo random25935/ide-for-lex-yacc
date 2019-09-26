@@ -2,7 +2,7 @@
 # -- coding: utf-8 --
 from __future__ import print_function
 
-from PySide2.QtWidgets import (QPlainTextEdit, QWidget, QVBoxLayout, QApplication, QFileDialog, QMessageBox, QLabel, QCompleter, 
+from PySide2.QtWidgets import (QPlainTextEdit, QWidget, QVBoxLayout, QApplication, QFileDialog, QMessageBox, QLabel, 
                                                     QHBoxLayout, QTextEdit, QToolBar, QComboBox, QAction, QLineEdit, QDialog, QPushButton, 
                                                      QToolButton, QMenu, QMainWindow, QInputDialog, QColorDialog, QStatusBar, QSystemTrayIcon)
 from PySide2.QtGui import (QIcon, QPainter, QTextFormat, QColor, QTextCursor, QKeySequence, QClipboard, QTextDocument, 
@@ -23,87 +23,6 @@ tab = chr(9)
 eof = "\n"
 iconsize = QSize(16, 16)
 
-class TextEdit(QPlainTextEdit):
-    def __init__(self, parent=None):
-        super(TextEdit, self).__init__(parent)
-
-        self.installEventFilter(self)
-        self._completer = None
-
-    def setCompleter(self, c):
-        if self._completer is not None:
-            self._completer.activated.disconnect()
-
-        self._completer = c
-        c.popup().setStyleSheet("background-color: #555753; color: #eeeeec; font-size: 8pt; selection-background-color: #4e9a06;")
-
-        c.setWidget(self)
-        c.setCompletionMode(QCompleter.PopupCompletion)
-        c.activated.connect(self.insertCompletion)
-
-    def completer(self):
-        return self._completer
-
-    def insertCompletion(self, completion):
-        if self._completer.widget() is not self:
-            return
-
-        tc = self.textCursor()
-        extra = len(completion) - len(self._completer.completionPrefix())
-        tc.movePosition(QTextCursor.Left)
-        tc.movePosition(QTextCursor.EndOfWord)
-        tc.insertText(completion[-extra:])
-        self.setTextCursor(tc)
-
-    def textUnderCursor(self):
-        tc = self.textCursor()
-        tc.select(QTextCursor.WordUnderCursor)
-
-        return tc.selectedText()
-
-    def focusInEvent(self, e):
-        if self._completer is not None:
-            self._completer.setWidget(self)
-
-        super(TextEdit, self).focusInEvent(e)
-
-    def keyPressEvent(self, e):
-        if e.key() == Qt.Key_Tab:
-            self.textCursor().insertText("    ")
-            return
-        if self._completer is not None and self._completer.popup().isVisible():
-            # The following keys are forwarded by the completer to the widget.
-            if e.key() in (Qt.Key_Enter, Qt.Key_Return):
-                e.ignore()
-                # Let the completer do default behavior.
-                return
-
-        isShortcut = ((e.modifiers() & Qt.ControlModifier) != 0 and e.key() == Qt.Key_Escape)
-        if self._completer is None or not isShortcut:
-            # Do not process the shortcut when we have a completer.
-            super(TextEdit, self).keyPressEvent(e)
-
-        ctrlOrShift = e.modifiers() & (Qt.ControlModifier | Qt.ShiftModifier)
-        if self._completer is None or (ctrlOrShift and len(e.text()) == 0):
-            return
-
-        eow = "~!@#$%^&*()_+{}|:\"<>?,./;'[]\\-="
-        hasModifier = (e.modifiers() != Qt.NoModifier) and not ctrlOrShift
-        completionPrefix = self.textUnderCursor()
-
-        if not isShortcut and (hasModifier or len(e.text()) == 0 or len(completionPrefix) < 2 or e.text()[-1] in eow):
-            self._completer.popup().hide()
-            return
-
-        if completionPrefix != self._completer.completionPrefix():
-            self._completer.setCompletionPrefix(completionPrefix)
-            self._completer.popup().setCurrentIndex(
-                    self._completer.completionModel().index(0, 0))
-
-        cr = self.cursorRect()
-        cr.setWidth(self._completer.popup().sizeHintForColumn(0) + self._completer.popup().verticalScrollBar().sizeHint().width())
-        self._completer.complete(cr)
-
 class NumberBar(QWidget):
     def __init__(self, parent = None):
         super(NumberBar, self).__init__(parent)
@@ -122,7 +41,6 @@ class NumberBar(QWidget):
 
     def update_width(self, string):
         width = self.fontMetrics().horizontalAdvance(str(string)) + 8
-        # width = self.fontMetrics().width(str(string)) + 8
         if self.width() != width:
             self.setFixedWidth(width)
 
@@ -173,9 +91,6 @@ class myEditor(QMainWindow):
         self.statusBar().showMessage(self.appfolder)
         self.lineLabel = QLabel("line")
         self.statusBar().addPermanentWidget(self.lineLabel)
-        # self.MaxRecentFiles = 15
-        # self.windowList = []
-        # self.recentFileActs = []
         self.settings = QSettings("IDE", "IDE")
         self.dirpath = QDir.homePath()
         self.setAttribute(Qt.WA_DeleteOnClose, True)
@@ -183,27 +98,15 @@ class myEditor(QMainWindow):
 
 
         # Editor Widget ...
-        self.editor = TextEdit()
-
-        self.completer = QCompleter(self)
-        self.completer.setModel(self.modelFromFile(self.root + '/resources/wordlist.txt'))
-        self.completer.setModelSorting(QCompleter.CaseInsensitivelySortedModel)
-        self.completer.setCaseSensitivity(Qt.CaseInsensitive)
-        self.completer.setWrapAround(False)
-        self.completer.setCompletionRole(Qt.EditRole)
-        self.editor.setCompleter(self.completer)
+        self.editor = QPlainTextEdit()
 
         self.editor.setStyleSheet(stylesheet2(self))
-#        self.editor.setTabStopWidth(20)
         self.editor.cursorPositionChanged.connect(self.cursorPositionChanged)
         self.extra_selections = []
         self.mainText = "#!/usr/bin/python3\n# -*- coding: utf-8 -*-\n"
         self.fname = ""
         self.filename = ""
         self.mypython = "2"
-        # self.mylabel = QTextEdit()
-        # self.mylabel.setFixedHeight(90)
-        # self.mylabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
         # Line Numbers ...
         self.numbers = NumberBar(self.editor)
         # Syntax Highlighter ...
@@ -213,9 +116,6 @@ class myEditor(QMainWindow):
         layoutH.setSpacing(1.5)
         layoutH.addWidget(self.numbers)
         layoutH.addWidget(self.editor)
-        ### systray
-        self.createTrayIcon()
-        self.trayIcon.show()
         ### statusbar
         self.statusBar()
         self.statusBar().setStyleSheet(stylesheet2(self))
@@ -245,10 +145,6 @@ class myEditor(QMainWindow):
         self.saveAsAct = QAction("&Save as ...", self, shortcut=QKeySequence.SaveAs,
                 statusTip="save file as ...", triggered=self.fileSaveAs)
         self.saveAsAct.setIcon(QIcon.fromTheme(self.root + "/icons/floppy25"))
-
-        self.jumpToAct = QAction("go to Definition", self, shortcut="F12",
-                                     statusTip="go to def", triggered=self.gotoBookmarkFromMenu)
-        self.jumpToAct.setIcon(QIcon.fromTheme("go-next"))
         
         ### comment buttons       
         # tb.addSeparator()           
@@ -271,28 +167,7 @@ class myEditor(QMainWindow):
                 statusTip="Uncomment selected block (F7)", triggered=self.uncommentBlock)
         self.uncommentBlockAct.setIcon(QIcon.fromTheme(self.root + "/icons/uncommentBlock"))
         tb.addAction(self.uncommentBlockAct)
-        ### color chooser
-        # tb.addSeparator()
-        # tb.addAction(QIcon.fromTheme(self.root + "/icons/color1"),"insert QColor", self.insertColor)
-        # tb.addSeparator()
-        # tb.addAction(QIcon.fromTheme("preferences-color"),"change Color", self.changeColor)    
-        ###insert templates
-        # tb.addSeparator()
-        # self.templates = QComboBox()
-        # self.templates.setStyleSheet(stylesheet2(self))
-        # self.templates.setFixedWidth(120)
-        # self.templates.setToolTip("insert template")
-        # self.templates.activated[str].connect(self.insertTemplate)
-        # tb.addWidget(self.templates)
-        ### path python buttons      
-        # tb.addSeparator()                               
-        # self.py3Act = QAction("run in Python 3.6 (F6)", self, shortcut="F6",
-        #         statusTip="run in Python 3 (F5)", triggered=self.runPy3)
-        # self.py3Act.setIcon(QIcon.fromTheme(self.root + "/icons/python3"))
-        # tb.addAction(self.py3Act)
-        # tb.addSeparator()
-        # tb.addAction(QIcon.fromTheme("edit-clear"),"clear Output Label", self.clearLabel)
-        # tb.addSeparator()
+
         ### print preview
         self.printPreviewAct = QAction("Print Preview", self, shortcut="Ctrl+Shift+P",
                 statusTip="Preview Document", triggered=self.handlePrintPreview)
@@ -303,18 +178,7 @@ class myEditor(QMainWindow):
                 statusTip="Print Document", triggered=self.handlePrint)
         self.printAct.setIcon(QIcon.fromTheme("document-print"))
         tb.addAction(self.printAct) 
-        ### about buttons
-        # tb.addSeparator()
-        # tb.addAction(QIcon.fromTheme(self.root + "/icons/info2"),"&About PyEdit", self.about)
-        # tb.addSeparator()
-        ### exit button
-        # self.exitAct = QAction("exit", self, shortcut=QKeySequence.Quit,
-        #         statusTip="Exit", triggered=self.handleQuit)
-        # self.exitAct.setIcon(QIcon.fromTheme(self.root + "/icons/quit"))
-        # tb.addAction(self.exitAct)     
-        ### end toolbar
-        # self.indentAct = QAction(QIcon.fromTheme(self.root + "/icons/format-indent-more"), "indent more", self, triggered = self.indentLine, shortcut = "F8")
-        # self.indentLessAct = QAction(QIcon.fromTheme(self.root + "/icons/format-indent-less"), "indent less", self, triggered = self.indentLessLine, shortcut = "F9")
+
         ### find / replace toolbar
         self.addToolBarBreak()
         tbf = self.addToolBar("Find")
@@ -352,37 +216,16 @@ class myEditor(QMainWindow):
         self.repAllAct.clicked.connect(self.replaceAll)
         tbf.addWidget(self.repAllAct)
         tbf.addSeparator()
-        # tbf.addAction(self.indentAct)
-        # tbf.addAction(self.indentLessAct)
-        tbf.addSeparator()
         self.gotofield = QLineEdit()
         self.gotofield.setStyleSheet(stylesheet2(self))
         self.gotofield.addAction(QIcon.fromTheme("next"), QLineEdit.LeadingPosition)
         self.gotofield.setClearButtonEnabled(True)
         self.gotofield.setFixedWidth(120)
-        self.gotofield.setPlaceholderText("go to line")
+        self.gotofield.setPlaceholderText("Go to line")
         self.gotofield.setToolTip("press RETURN to go to line")
         self.gotofield.returnPressed.connect(self.gotoLine)
         tbf.addWidget(self.gotofield)
         
-        # tbf.addSeparator() 
-        # self.bookmarks = QComboBox()
-        # self.bookmarks.setStyleSheet(stylesheet2(self))
-        # self.bookmarks.setFixedWidth(280)
-        # self.bookmarks.setToolTip("go to bookmark")
-        # self.bookmarks.activated[str].connect(self.gotoBookmark)
-        # tbf.addWidget(self.bookmarks)
-
-        # self.bookAct = QAction("add Bookmark", self,
-        #         statusTip="add Bookmark", triggered=self.addBookmark)
-        # self.bookAct.setIcon(QIcon.fromTheme("previous"))
-        # tbf.addAction(self.bookAct)
-        
-        # tbf.addSeparator()
-        # self.bookrefresh = QAction("update Bookmarks", self,
-        #         statusTip="update Bookmarks", triggered=self.findBookmarks)
-        # self.bookrefresh.setIcon(QIcon.fromTheme("view-refresh"))
-        # tbf.addAction(self.bookrefresh)
         tbf.addAction(QAction(QIcon.fromTheme("document-properties"), "check && reindent Text", self, triggered=self.reindentText))
         
         layoutV = QVBoxLayout()
@@ -397,39 +240,21 @@ class myEditor(QMainWindow):
         self.filemenu.addAction(self.saveAct)
         self.filemenu.addAction(self.saveAsAct)
         self.filemenu.addSeparator()
-        self.filemenu.addSeparator()
-        self.filemenu.addSeparator()
-        # self.filemenu.addAction(self.exitAct)
         
         editmenu = bar.addMenu("Edit")
         editmenu.setStyleSheet(stylesheet2(self))
-        editmenu.addAction(QAction(QIcon.fromTheme('edit-undo'), "Undo", self, triggered = self.editor.undo, shortcut = "Ctrl+u"))
+        editmenu.addAction(QAction(QIcon.fromTheme('edit-undo'), "Undo", self, triggered = self.editor.undo, shortcut = "Ctrl+U"))
         editmenu.addAction(QAction(QIcon.fromTheme('edit-redo'), "Redo", self, triggered = self.editor.redo, shortcut = "Shift+Ctrl+u"))
         editmenu.addSeparator()
-        editmenu.addAction(QAction(QIcon.fromTheme('edit-copy'), "Copy", self, triggered = self.editor.copy, shortcut = "Ctrl+c"))
-        editmenu.addAction(QAction(QIcon.fromTheme('edit-cut'), "Cut", self, triggered = self.editor.cut, shortcut = "Ctrl+x"))
-        editmenu.addAction(QAction(QIcon.fromTheme('edit-paste'), "Paste", self, triggered = self.editor.paste, shortcut = "Ctrl+v"))
+        editmenu.addAction(QAction(QIcon.fromTheme('edit-copy'), "Copy", self, triggered = self.editor.copy, shortcut = "Ctrl+C"))
+        editmenu.addAction(QAction(QIcon.fromTheme('edit-cut'), "Cut", self, triggered = self.editor.cut, shortcut = "Ctrl+X"))
+        editmenu.addAction(QAction(QIcon.fromTheme('edit-paste'), "Paste", self, triggered = self.editor.paste, shortcut = "Ctrl+V"))
         editmenu.addAction(QAction(QIcon.fromTheme('edit-delete'), "Delete", self, triggered = self.editor.cut, shortcut = "Del"))
         editmenu.addSeparator()
         editmenu.addAction(QAction(QIcon.fromTheme('edit-select-all'), "Select All", self, triggered = self.editor.selectAll, shortcut = "Ctrl+a"))
         editmenu.addSeparator()
-        # editmenu.addAction(self.commentAct)
-        # editmenu.addAction(self.uncommentAct)
-        # editmenu.addSeparator()
-        # editmenu.addAction(self.commentBlockAct)
-        # editmenu.addAction(self.uncommentBlockAct)
-        # editmenu.addSeparator()
-        # editmenu.addAction(self.py3Act)
-        # editmenu.addSeparator()
-        # editmenu.addAction(self.jumpToAct)
-        # editmenu.addSeparator()
-        # editmenu.addAction(self.indentAct)
-        # editmenu.addAction(self.indentLessAct)
 
         layoutV.addLayout(layoutH)
-        # self.mylabel.setMinimumHeight(28)
-        # self.mylabel.setStyleSheet(stylesheet2(self))
-        # layoutV.addWidget(self.mylabel)
         ### main window
         mq = QWidget(self)
         mq.setLayout(layoutV)
@@ -447,20 +272,6 @@ class myEditor(QMainWindow):
         # Brackets ExtraSelection ...
         self.left_selected_bracket  = QTextEdit.ExtraSelection()
         self.right_selected_bracket = QTextEdit.ExtraSelection()
-        
-        # ## shell settings
-        # self.process = QProcess(self)
-        # self.process.setProcessChannelMode(QProcess.MergedChannels)
-        # self.process.readyRead.connect(self.dataReady)
-        # self.process.started.connect(lambda: self.mylabel.append("starting shell"))
-        # self.process.finished.connect(lambda: self.mylabel.append("shell ended"))
-
-        # self.editor.setContextMenuPolicy(Qt.CustomContextMenu)
-        # self.editor.customContextMenuRequested.connect(self.contextMenuRequested)
-        
-        # self.loadTemplates()   
-        # self.readSettings()
-        # self.statusBar().showMessage("self.root is: " + self.root, 0)
 
     def keyPressEvent(self, event):
         if  self.editor.hasFocus():
@@ -470,34 +281,7 @@ class myEditor(QMainWindow):
     def cursorPositionChanged(self):
         line = self.editor.textCursor().blockNumber() + 1
         pos = self.editor.textCursor().positionInBlock()
-        self.lineLabel.setText("line " + str(line) + " - position " + str(pos))
-        
-    def textColor(self):
-        col = QColorDialog.getColor(QColor("#" + self.editor.textCursor().selectedText()), self)
-        self.pix.fill(col)
-        if not col.isValid():
-            return
-        else:
-            colorname = 'QColor("' + col.name() + '")'
-            self.editor.textCursor().insertText(colorname)
-            self.pix.fill(col)
-        
-    def loadTemplates(self):
-        folder = self.appfolder + "/templates"
-        if QDir().exists(folder):
-            self.currentDir = QDir(folder)
-            count = self.currentDir.count()
-            fileName = "*"
-            files = self.currentDir.entryList([fileName],
-                    QDir.Files | QDir.NoSymLinks)
-
-            for i in range(count - 2):
-                file = (files[i])
-                if file.endswith(".txt"):
-                    self.templates.addItem(file.replace(self.appfolder + "/templates", "").replace(".txt", ""))
-        
-    def Test(self):
-        self.editor.selectAll()
+        self.lineLabel.setText("Line " + str(line) + " , Position " + str(pos))
         
     def reindentText(self):
         if self.editor.toPlainText() == "" or self.editor.toPlainText() == self.mainText:
@@ -510,83 +294,6 @@ class myEditor(QMainWindow):
             self.editor.textCursor().insertText(newtext)    
             self.statusBar().showMessage("Reindented.")
 
-    # def insertColor(self):
-    #     col = QColorDialog.getColor(QColor("#000000"), self)
-    #     if not col.isValid():
-    #         return
-    #     else:
-    #         colorname = 'QColor("' + col.name() + '")'
-    #         self.editor.textCursor().insertText(colorname)
-            
-    # def changeColor(self):
-    #     if not self.editor.textCursor().selectedText() == "":
-    #         col = QColorDialog.getColor(QColor("#" + self.editor.textCursor().selectedText()), self)
-    #         if not col.isValid():
-    #             return
-    #         else:
-    #             colorname = col.name()
-    #             self.editor.textCursor().insertText(colorname.replace("#", ""))
-    #     else:
-    #         col = QColorDialog.getColor(QColor("black"), self)
-    #         if not col.isValid():
-    #             return
-    #         else:
-    #             colorname = col.name()
-    #             self.editor.textCursor().insertText(colorname)
-
-    ### QPlainTextEdit contextMenu
-    def contextMenuRequested(self,point):
-        cmenu = QMenu()
-        cmenu = self.editor.createStandardContextMenu()
-        cmenu.addSeparator()
-        cmenu.addAction(self.jumpToAct)
-        cmenu.addSeparator()
-        if not self.editor.textCursor().selectedText() == "":
-            cmenu.addAction(QIcon.fromTheme("gtk-find-and-replace"),"replace all occurrences with", self.replaceThis)
-            cmenu.addSeparator()
-        cmenu.addAction(QIcon.fromTheme("zeal"),"show help with 'zeal'", self.showZeal)
-        cmenu.addAction(QIcon.fromTheme("gtk-find-"),"find this (F10)", self.findNextWord)
-        cmenu.addSeparator()
-        cmenu.addAction(self.py3Act)
-        cmenu.addSeparator()
-        cmenu.addAction(self.commentAct)
-        cmenu.addAction(self.uncommentAct)
-        cmenu.addSeparator()
-        if not self.editor.textCursor().selectedText() == "":
-            cmenu.addAction(self.commentBlockAct)
-            cmenu.addAction(self.uncommentBlockAct)
-            cmenu.addSeparator()
-            cmenu.addAction(self.indentAct)
-            cmenu.addAction(self.indentLessAct)       
-        cmenu.addSeparator()
-        cmenu.addAction(QIcon.fromTheme("preferences-color"),"insert QColor", self.insertColor)
-
-        cmenu.addSeparator()
-        cmenu.addAction(QIcon.fromTheme("preferences-color"),"change Color", self.changeColor)
-        cmenu.exec_(self.editor.mapToGlobal(point))    
-        
-    def replaceThis(self):
-        rtext = self.editor.textCursor().selectedText()
-        text = QInputDialog.getText(self, "replace with","replace '" + rtext + "' with:", QLineEdit.Normal, "")
-        oldtext = self.editor.document().toPlainText()
-        if not (text[0] == ""):
-            newtext = oldtext.replace(rtext, text[0])
-            self.editor.setPlainText(newtext)
-            self.setModified(True)
-
-    def showZeal(self):
-        if self.editor.textCursor().selectedText() == "":
-            tc = self.editor.textCursor()
-            tc.select(QTextCursor.WordUnderCursor)
-            rtext = tc.selectedText()
-            print(rtext)
-#            self.editor.moveCursor(QTextCursor.StartOfWord, QTextCursor.MoveAnchor)
-#            self.editor.moveCursor(QTextCursor.EndOfWord, QTextCursor.KeepAnchor)
-        else:
-            rtext = self.editor.textCursor().selectedText()
-        cmd = "zeal " + str(rtext)
-        QProcess().startDetached(cmd)
-
     def findNextWord(self):
         if self.editor.textCursor().selectedText() == "":
             self.editor.moveCursor(QTextCursor.StartOfWord, QTextCursor.MoveAnchor)
@@ -594,35 +301,6 @@ class myEditor(QMainWindow):
         rtext = self.editor.textCursor().selectedText()
         self.findfield.setText(rtext)
         self.findText()
-
-        
-    def indentLine(self):
-        if not self.editor.textCursor().selectedText() == "":
-            newline = u"\u2029"
-            list = []
-            ot = self.editor.textCursor().selectedText()
-            theList  = ot.splitlines()
-            linecount = ot.count(newline)
-            for i in range(linecount + 1):
-                list.insert(i, "    " + theList[i])
-            self.editor.textCursor().insertText(newline.join(list))
-            self.setModified(True)   
-#            self.editor.find(ot)
-            self.statusBar().showMessage("tabs indented")
-        
-    def indentLessLine(self):
-        if not self.editor.textCursor().selectedText() == "":
-            newline = u"\u2029"
-            list = []
-            ot = self.editor.textCursor().selectedText()
-            theList  = ot.splitlines()
-            linecount = ot.count(newline)
-            for i in range(linecount + 1):
-                list.insert(i, (theList[i]).replace("    ", "", 1))
-            self.editor.textCursor().insertText(newline.join(list))
-            self.setModified(True)    
-#            self.editor.find(ot)
-            self.statusBar().showMessage("tabs deleted")
         
     def dataReady(self):
         out = ""
@@ -645,11 +323,6 @@ class myEditor(QMainWindow):
         self.mylabel.moveCursor(self.cursor.End)
         self.mylabel.ensureCursorVisible()
         
-    def addBookmark(self):
-        linenumber = self.getLineNumber()
-        linetext = self.editor.textCursor().block().text().strip()
-        self.bookmarks.addItem(linetext, linenumber)
-        
     def getLineNumber(self):
         self.editor.moveCursor(self.cursor.StartOfLine)
         linenumber = self.editor.textCursor().blockNumber() + 1
@@ -671,78 +344,6 @@ class myEditor(QMainWindow):
                 self.editor.moveCursor(QTextCursor.EndOfLine, QTextCursor.KeepAnchor)
             else:
                 return
-        
-    def gotoBookmark(self):
-        if self.editor.find(self.bookmarks.itemText(self.bookmarks.currentIndex())):
-            pass
-        else:
-            self.editor.moveCursor(QTextCursor.Start)
-            self.editor.find(self.bookmarks.itemText(self.bookmarks.currentIndex()))
-
-        self.editor.centerCursor()
-        self.editor.moveCursor(self.cursor.StartOfLine, self.cursor.MoveAnchor)
-        
-    def gotoBookmarkFromMenu(self):
-        if self.editor.textCursor().selectedText() == "":
-            tc = self.editor.textCursor()
-            tc.select(QTextCursor.WordUnderCursor)
-            rtext = tc.selectedText()
-        else:
-            rtext = self.editor.textCursor().selectedText()
-        toFind = rtext
-        self.bookmarks.setCurrentIndex(0)
-        if self.bookmarks.findText(toFind, Qt.MatchContains):
-            row = self.bookmarks.findText(toFind, Qt.MatchContains)
-            self.statusBar().showMessage("found '" + toFind + "' at bookmark "  + str(row))
-            self.bookmarks.setCurrentIndex(row)
-            self.gotoBookmark()
-        else:
-            self.statusBar().showMessage("def not found")
-            
-    # def clearBookmarks(self):
-    #     self.bookmarks.clear()
-    #### find lines with def or class
-    # def findBookmarks(self):
-    #     self.editor.setFocus()
-    #     self.editor.moveCursor(QTextCursor.Start)
-    #     if not self.editor.toPlainText() == "":
-    #         # self.clearBookmarks()
-    #         newline = "\n" #u"\2029"
-    #         fr = "from"
-    #         im = "import"
-    #         d = "def"
-    #         d2 = "    def"
-    #         c = "class"
-    #         sn = str("if __name__ ==")
-    #         line = ""
-    #         list = []
-    #         ot = self.editor.toPlainText()
-    #         theList  = ot.split(newline)
-    #         linecount = ot.count(newline)
-    #         for i in range(linecount + 1):
-    #             if theList[i].startswith(im):
-    #                 line = str(theList[i]).replace("'\t','[", "").replace("]", "")
-    #                 self.bookmarks.addItem(str(line), i)
-    #             elif theList[i].startswith(fr):
-    #                 line = str(theList[i]).replace("'\t','[", "").replace("]", "")
-    #                 self.bookmarks.addItem(str(line), i)
-    #             elif theList[i].startswith(c):
-    #                 line = str(theList[i]).replace("'\t','[", "").replace("]", "")
-    #                 self.bookmarks.addItem(str(line), i)
-    #             elif theList[i].startswith(tab + d):
-    #                 line = str(theList[i]).replace(tab, "").replace("'\t','[", "").replace("]", "")
-    #                 self.bookmarks.addItem(str(line), i)
-    #             elif theList[i].startswith(d):
-    #                 line = str(theList[i]).replace(tab, "").replace("'\t','[", "").replace("]", "")
-    #                 self.bookmarks.addItem(str(line), i)
-    #             elif theList[i].startswith(d2):
-    #                 line = str(theList[i]).replace(tab, "").replace("'\t','[", "").replace("]", "")
-    #                 self.bookmarks.addItem(str(line), i)
-    #             elif theList[i].startswith(sn):
-    #                 line = str(theList[i]).replace("'\t','[", "").replace("]", "")
-    #                 self.bookmarks.addItem(str(line), i)
-                
-        self.statusBar().showMessage("bookmarks changed")
                 
     def clearLabel(self):
         self.mylabel.setText("")
@@ -757,7 +358,6 @@ class myEditor(QMainWindow):
             self.editor.moveCursor(self.cursor.End)
             self.statusBar().showMessage("new File created.")
             self.editor.setFocus()
-            self.bookmarks.clear()
             self.setWindowTitle("new File[*]")
             
        ### open File
@@ -776,26 +376,7 @@ class myEditor(QMainWindow):
                 self.setModified(False)
                 self.setCurrentFile(path)
                 self.editor.setFocus()
-                # self.findBookmarks()
-                ### save backup
-                file = QFile(self.filename + "_backup")
-                if not file.open( QFile.WriteOnly | QFile.Text):
-                    QMessageBox.warning(self, "Error",
-                        "Cannot write file %s:\n%s." % (self.filename, file.errorString()))
-                    return
-                outstr = QTextStream(file)
-                QApplication.setOverrideCursor(Qt.WaitCursor)
-                outstr << self.editor.toPlainText()
-                QApplication.restoreOverrideCursor()  
-                self.statusBar().showMessage("File '" + path + "' loaded succesfully & bookmarks added & backup created ('" + self.filename + "_backup" + "')")
-
-             ### add all words to completer ###
-#                mystr = self.editor.toPlainText()
-#                self.wordList =mystr.split()
-#                print(mystr)
-#                self.completer.setModel(self.modelFromFile(self.root + '/resources/wordlist.txt'))
-        
-        ### open File
+    ### open File
     def openFile(self, path=None):
         if self.maybeSave():
             if not path:
@@ -877,34 +458,6 @@ class myEditor(QMainWindow):
             return False
 
         return True   
-        
-    # def about(self):
-    #     title = "about PyEdit"
-    #     message = """
-    #                 <span style='color: #3465a4; font-size: 20pt;font-weight: bold;'
-    #                 >PyEdit 2.1</strong></span></p><h3>Python Editor</h3>created by  
-    #                 <a title='Axel Schneider' href='http://goodoldsongs.jimdo.com' target='_blank'>Axel Schneider</a> with PyQt5<br><br>
-    #                 <span style='color: #555753; font-size: 9pt;'>©2017 Axel Schneider</strong></span></p>
-    #                     """
-    #     self.infobox(title, message)
-        
-    def runPy3(self):
-        if self.editor.toPlainText() == "":
-            self.statusBar().showMessage("no Code!")
-            return
-        if not self.editor.toPlainText() == self.mainText:
-            if self.filename:
-                self.mypython = "3"
-                self.statusBar().showMessage("running " + self.filename + " in Python 3")
-                self.fileSave()
-                cmd = "python3"
-                self.readData(cmd)
-            else:
-                self.filename = "/tmp/tmp.py"
-                self.fileSave()
-                self.runPy3()
-        else:
-            self.statusBar().showMessage("no code to run")
             
     def readData(self, cmd):
         self.mylabel.clear()
@@ -912,13 +465,6 @@ class myEditor(QMainWindow):
         self.statusBar().showMessage(str(dname))
         QProcess().execute("cd '" + dname + "'")
         self.process.start(cmd,['-u', dname + self.strippedName(self.filename)])
-        
-    def killPython(self):
-        if (self.mypython == "3"):
-            cmd = "killall python3"
-        else:
-            cmd = "killall python"
-        self.readData(cmd)
         
     def commentBlock(self):
         self.editor.copy()
@@ -986,8 +532,7 @@ class myEditor(QMainWindow):
                 self.editor.moveCursor(QTextCursor.StartOfLine)
         
     def goToLine(self, ft):
-        self.editor.moveCursor(int(self.gofield.currentText()),
-                                QTextCursor.MoveAnchor) ### not working
+        self.editor.moveCursor(int(self.gofield.currentText()),QTextCursor.MoveAnchor)
         
     def findText(self):
         word = self.findfield.text()
@@ -1003,11 +548,6 @@ class myEditor(QMainWindow):
                 self.statusBar().showMessage("found <b>'" + self.findfield.text() + "'</b> at Line: " + str(linenumber))
                 self.editor.centerCursor()
             
-    def findBookmark(self, word):
-        if self.editor.find(word):
-            linenumber = self.getLineNumber() #self.editor.textCursor().blockNumber() + 1
-            self.statusBar().showMessage("found <b>'" + self.findfield.text() + "'</b> at Line: " + str(linenumber))
-            
     def handleQuit(self):
         if self.maybeSave():
             print("Goodbye ...")
@@ -1016,105 +556,12 @@ class myEditor(QMainWindow):
     def set_numbers_visible(self, value = True):
         self.numbers.setVisible(False)
 
-    def match_left(self, block, character, start, found):
-        map = {'{': '}', '(': ')', '[': ']'}
-
-        while block.isValid():
-            data = block.userData()
-            if data is not None:
-                braces = data.braces
-                N = len(braces)
-
-                for k in range(start, N):
-                    if braces[k].character == character:
-                        found += 1
-
-                    if braces[k].character == map[character]:
-                        if not found:
-                            return braces[k].position + block.position()
-                        else:
-                            found -= 1
-
-                block = block.next()
-                start = 0
-
-    def match_right(self, block, character, start, found):
-        map = {'}': '{', ')': '(', ']': '['}
-
-        while block.isValid():
-            data = block.userData()
-
-            if data is not None:
-                braces = data.braces
-
-                if start is None:
-                    start = len(braces)
-                for k in range(start - 1, -1, -1):
-                    if braces[k].character == character:
-                        found += 1
-                    if braces[k].character == map[character]:
-                        if found == 0:
-                            return braces[k].position + block.position()
-                        else:
-                            found -= 1
-            block = block.previous()
-            start = None
-
-
-        cursor = self.editor.textCursor()
-        block = cursor.block()
-        data = block.userData()
-        previous, next = None, None
-
-        if data is not None:
-            position = cursor.position()
-            block_position = cursor.block().position()
-            braces = data.braces
-            N = len(braces)
-
-            for k in range(0, N):
-                if braces[k].position == position - block_position or braces[k].position == position - block_position - 1:
-                    previous = braces[k].position + block_position
-                    if braces[k].character in ['{', '(', '[']:
-                        next = self.match_left(block,
-                                               braces[k].character,
-                                               k + 1, 0)
-                    elif braces[k].character in ['}', ')', ']']:
-                        next = self.match_right(block,
-                                                braces[k].character,
-                                                k, 0)
-                    if next is None:
-                        next = -1
-
-        if next is not None and next > 0:
-            if next == 0 and next >= 0:
-                format = QTextCharFormat()
-
-            cursor.setPosition(previous)
-            cursor.movePosition(QTextCursor.NextCharacter,
-                                QTextCursor.KeepAnchor)
-
-            format.setBackground(QColor('white'))
-            self.left_selected_bracket.format = format
-            self.left_selected_bracket.cursor = cursor
-
-            cursor.setPosition(next)
-            cursor.movePosition(QTextCursor.NextCharacter,
-                                QTextCursor.KeepAnchor)
-
-            format.setBackground(QColor('white'))
-            self.right_selected_bracket.format = format
-            self.right_selected_bracket.cursor = cursor
-
     def paintEvent(self, event):
         highlighted_line = QTextEdit.ExtraSelection()
         highlighted_line.format.setBackground(lineHighlightColor)
         highlighted_line.format.setProperty(QTextFormat
                                                  .FullWidthSelection,
-                                                  True)
-        # highlighted_line.format.setProperty(QTextFormat
-        #                                          .FullWidthSelection,
-        #                                           QVariant(True))                                          
+                                                  True)                                     
         highlighted_line.cursor = self.editor.textCursor()
         highlighted_line.cursor.clearSelection()
         self.editor.setExtraSelections([highlighted_line,
@@ -1148,7 +595,7 @@ class myEditor(QMainWindow):
     def replaceAll(self):
         if not self.editor.document().toPlainText() == "":
             if not self.findfield.text() == "":
-                self.statusBar().showMessage("replacing all")
+                self.statusBar().showMessage("Replacing all")
                 oldtext = self.editor.document().toPlainText()
                 newtext = oldtext.replace(self.findfield.text(), self.replacefield.text())
                 self.editor.setPlainText(newtext)
@@ -1161,7 +608,7 @@ class myEditor(QMainWindow):
     def replaceOne(self):
         if not self.editor.document().toPlainText() == "":
             if not self.findfield.text() == "":
-                self.statusBar().showMessage("replacing all")
+                self.statusBar().showMessage("Replacing all")
                 oldtext = self.editor.document().toPlainText()
                 newtext = oldtext.replace(self.findfield.text(), self.replacefield.text(), 1)
                 self.editor.setPlainText(newtext)
@@ -1196,48 +643,6 @@ class myEditor(QMainWindow):
     def msgbox(self,title, message):
         QMessageBox.warning(self, title, message)
         
-    def infobox(self,title, message):
-        QMessageBox(QMessageBox.Information, title, message, QMessageBox.NoButton, self, Qt.Dialog|Qt.NoDropShadowWindowHint).show()        
-        
-    def insertTemplate(self):
-        line = int(self.getLineNumber())
-        path = self.appfolder + "/templates/" + self.templates.itemText(self.templates.currentIndex()) + ".txt"
-        if path:
-            inFile = QFile(path)
-            if inFile.open(QFile.ReadOnly | QFile.Text):
-                text = inFile.readAll()
-                self.editor.setFocus()
-                try: ### python 3
-                    self.editor.textCursor().insertText(str(text, encoding = 'utf8'))
-                except TypeError:  ### python 2
-                    self.editor.textCursor().insertText(str(text))
-                self.setModified(True)
-                self.findBookmarks()
-                self.statusBar().showMessage("'" + self.templates.itemText(self.templates.currentIndex()) + "' inserted")
-                inFile.close()
-                text = ""
-                self.selectLine(line)
-            else:
-                self.statusBar().showMessage("error loadind Template")
-            
-    def selectLine(self, line):
-        linecursor = QTextCursor(self.editor.document().findBlockByLineNumber(line-1))
-        self.editor.moveCursor(QTextCursor.End)
-        self.editor.setTextCursor(linecursor)
-        
-    def createTrayIcon(self):
-        if not QSystemTrayIcon.isSystemTrayAvailable():
-            QMessageBox.critical(None, "Systray",
-                    "I couldn't detect any system tray on this system.")
-        else:
-            self.trayIcon = QSystemTrayIcon(self)
-            self.trayIcon.setIcon(QIcon.fromTheme("applications-python"))
-            self.trayIconMenu = QMenu(self)
-            # self.trayIconMenu.addAction(QAction(QIcon.fromTheme("applications-python"), "about PyEdit", self, triggered=self.about))
-            self.trayIconMenu.addSeparator()
-            self.trayIconMenu.addAction(QAction(QIcon.fromTheme("application-exit"),"Exit", self, triggered=self.handleQuit))
-            self.trayIcon.setContextMenu(self.trayIconMenu)
-        
     def handlePrint(self):
         if self.editor.toPlainText() == "":
             self.statusBar().showMessage("no text")
@@ -1261,36 +666,6 @@ class myEditor(QMainWindow):
         printer.setDocName(self.filename)
         document = self.editor.document()
         document.print_(printer)
-
-    def modelFromFile(self, fileName):
-        f = QFile(fileName)
-        if not f.open(QFile.ReadOnly):
-            return QStringListModel(self.completer)
-
-        QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
-
-        self.words = []
-        while not f.atEnd():
-            line = f.readLine().trimmed()
-            if line.length() != 0:
-                try:
-                    line = str(line, encoding='ascii')
-                except TypeError:
-                    line = str(line)
-
-                self.words.append(line)
-#                print("\n".join(self.wordList))
-#                self.words.append("\n".join(self.wordList))
-
-        QApplication.restoreOverrideCursor()
-
-        return QStringListModel(self.words, self.completer)
-                
-  
-# self.editor.setStyleSheet("""QPlainTextEdit{
-#         font-family:'Consolas'; 
-#         color: #ccc; 
-#         background-color: #2b2b2b;}""")
 
 
 def stylesheet2(self):
