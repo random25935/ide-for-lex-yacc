@@ -103,7 +103,7 @@ class myEditor(QMainWindow):
         self.editor.setStyleSheet(stylesheet2(self))
         self.editor.cursorPositionChanged.connect(self.cursorPositionChanged)
         self.extra_selections = []
-        self.mainText = "#!/usr/bin/python3\n# -*- coding: utf-8 -*-\n"
+        self.mainText = "//Type program here\n"
         self.fname = ""
         self.filename = ""
         self.mypython = "2"
@@ -470,8 +470,8 @@ class myEditor(QMainWindow):
         self.editor.copy()
         clipboard = QApplication.clipboard();
         originalText = clipboard.text()
-        mt1 = tab + tab + "'''" + "\n"
-        mt2 = "\n" + tab + tab + "'''"
+        mt1 = "/*\n"
+        mt2 = "\n*/"
         mt = mt1 + originalText + mt2
         clipboard.setText(mt)
         self.editor.paste()
@@ -480,16 +480,16 @@ class myEditor(QMainWindow):
         self.editor.copy()
         clipboard = QApplication.clipboard();
         originalText = clipboard.text()
-        mt1 = tab + tab + "'''" + "\n"
-        mt2 = "\n" + tab + tab + "'''"
+        mt1 = "/*\n"
+        mt2 = "\n*/"
         clipboard.setText(originalText.replace(mt1, "").replace(mt2, ""))
         self.editor.paste()
         
-        self.statusBar().showMessage("added block comment")
+        self.statusBar().showMessage("Added block comment")
             
     def commentLine(self):
         newline = u"\u2029"
-        comment = "#"
+        comment = "//"
         list = []
         ot = self.editor.textCursor().selectedText()
         if not self.editor.textCursor().selectedText() == "":
@@ -504,11 +504,11 @@ class myEditor(QMainWindow):
         else:
             ### one line selected
             self.editor.moveCursor(QTextCursor.StartOfLine)
-            self.editor.textCursor().insertText("#")
+            self.editor.textCursor().insertText("//")
             
             
     def uncommentLine(self):
-        comment = "#"
+        comment = "//"
         newline = u"\u2029"
         list = []
         ot = self.editor.textCursor().selectedText()
